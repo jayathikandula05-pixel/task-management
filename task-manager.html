@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Flow — Task Manager</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Inter','system-ui','sans-serif'] },
+        colors: {
+          brand: { 50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81'},
+        },
+        boxShadow: { soft:'0 10px 30px -10px rgba(79,70,229,0.25)' },
+        animation: {
+          'fade-in':'fadeIn .35s ease-out both',
+          'slide-up':'slideUp .35s ease-out both',
+          'pop':'pop .25s ease-out both',
+        },
+        keyframes: {
+          fadeIn:{'0%':{opacity:0},'100%':{opacity:1}},
+          slideUp:{'0%':{opacity:0,transform:'translateY(10px)'},'100%':{opacity:1,transform:'translateY(0)'}},
+          pop:{'0%':{transform:'scale(.96)',opacity:0},'100%':{transform:'scale(1)',opacity:1}}
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html,body{font-family:'Inter',system-ui,sans-serif;}
+  .gradient-text{background:linear-gradient(135deg,#6366f1,#a855f7,#ec4899);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .gradient-bg{background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#ec4899 100%);}
+  .gradient-border{position:relative;}
+  .glass{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
+  .scrollbar-thin::-webkit-scrollbar{width:6px;height:6px}
+  .scrollbar-thin::-webkit-scrollbar-thumb{background:rgba(99,102,241,.3);border-radius:3px}
+  .task-card.dragging{opacity:.4;transform:rotate(2deg);}
+  .drop-zone.drag-over{background:rgba(99,102,241,.08);border-color:#6366f1!important;}
+  input,select,textarea,button{font-family:inherit;}
+  .checkbox-custom{transition:all .2s;}
+  .checkbox-custom.checked{background:linear-gradient(135deg,#6366f1,#a855f7);border-color:transparent;}
+  .toast-enter{animation:slideInRight .3s ease-out both;}
+  @keyframes slideInRight{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
+  .loader{width:48px;height:48px;border:4px solid rgba(99,102,241,.2);border-top-color:#6366f1;border-radius:50%;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
+
+<!-- AUTH SCREEN -->
+<div id="authScreen" class="min-h-screen hidden items-center justify-center p-4 relative overflow-hidden">
+  <div class="absolute inset-0 -z-10">
+    <div class="absolute top-0 -left-20 w-96 h-96 bg-brand-500/30 rounded-full blur-3xl"></div>
+    <div class="absolute bottom-0 -right-20 w-96 h-96 bg-pink-500/30 rounded-full blur-3xl"></div>
+  </div>
+  <div class="w-full max-w-md">
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center gap-2 mb-4">
+        <div class="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center shadow-soft">
+          <i class="fa-solid fa-bolt text-white"></i>
+        </div>
+        <span class="text-2xl font-bold gradient-text">Flow</span>
+      </div>
+      <h1 class="text-3xl font-bold">Welcome back</h1>
+      <p class="text-slate-500 dark:text-slate-400 mt-2">Manage your work, beautifully.</p>
+    </div>
+    <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-soft p-6 border border-slate-200 dark:border-slate-800 animate-pop">
+      <div class="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg mb-6">
+        <button id="tabLogin" class="flex-1 py-2 rounded-md font-medium text-sm bg-white dark:bg-slate-900 shadow">Login</button>
+        <button id="tabSignup" class="flex-1 py-2 rounded-md font-medium text-sm text-slate-500">Sign up</button>
+      </div>
+      <form id="loginForm" class="space-y-4">
+        <div>
+          <label class="text-sm font-medium">Email</label>
+          <input type="email" name="email" required class="mt-1 w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-brand-500"/>
+        </div>
+        <div>
+          <label class="text-sm font-medium">Password</label>
+          <input type="password" name="password" required minlength="4" class="mt-1 w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-brand-500"/>
+        </div>
+        <button type="submit" class="w-full py-2.5 rounded-lg gradient-bg text-white font-semibold shadow-soft hover:opacity-95 transition">Login</button>
+      </form>
+      <form id="signupForm" class="space-y-4 hidden">
+        <div>
+          <label class="text-sm font-medium">Name</label>
+          <input type="text" name="name" required class="mt-1 w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-brand-500"/>
+        </div>
+        <div>
+          <label class="text-sm font-medium">Email</label>
+          <input type="email" name="email" required class="mt-1 w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-brand-500"/>
+        </div>
+        <div>
+          <label class="text-sm font-medium">Password</label>
+          <input type="password" name="password" required minlength="4" class="mt-1 w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-brand-500"/>
+        </div>
+        <button type="submit" class="w-full py-2.5 rounded-lg gradient-bg text-white font-semibold shadow-soft hover:opacity-95 transition">Create account</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden min-h-screen flex">
+  <!-- SIDEBAR -->
+  <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-40 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transform -translate-x-full lg:translate-x-0 transition-transform">
+    <div class="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
+      <div class="w-9 h-9 rounded-xl gradient-bg flex items-center justify-center shadow-soft">
+        <i class="fa-solid fa-bolt text-white"></i>
+      </div>
+      <span class="text-xl font-bold gradient-text">Flow</span>
+    </div>
+    <nav class="p-3 space-y-1">
+      <button data-view="dashboard" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm hover:bg-slate-100 dark:hover:bg-slate-800">
+        <i class="fa-solid fa-gauge-high w-5 text-brand-500"></i>Dashboard
+      </button>
+      <button data-view="tasks" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm hover:bg-slate-100 dark:hover:bg-slate-800">
+        <i class="fa-solid fa-list-check w-5 text-brand-500"></i>Tasks
+      </button>
+      <button data-view="board" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm hover:bg-slate-100 dark:hover:bg-slate-800">
+        <i class="fa-solid fa-table-columns w-5 text-brand-500"></i>Board
+      </button>
+      <button data-view="calendar" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm hover:bg-slate-100 dark:hover:bg-slate-800">
+        <i class="fa-solid fa-calendar-days w-5 text-brand-500"></i>Calendar
+      </button>
+    </nav>
+    <div class="absolute bottom-0 left-0 right-0 p-3 border-t border-slate-200 dark:border-slate-800">
+      <div id="userPill" class="flex items-center gap-3 p-2 rounded-lg">
+        <div class="w-9 h-9 rounded-full gradient-bg flex items-center justify-center text-white font-bold text-sm" id="userAvatar">U</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-semibold truncate" id="userName">User</div>
+          <div class="text-xs text-slate-500 truncate" id="userEmail"></div>
+        </div>
+        <button id="logoutBtn" title="Logout" class="text-slate-400 hover:text-red-500 p-2"><i class="fa-solid fa-right-from-bracket"></i></button>
+      </div>
+    </div>
+  </aside>
+  <div id="sidebarBackdrop" class="hidden lg:hidden fixed inset-0 bg-black/40 z-30"></div>
+
+  <!-- MAIN -->
+  <main class="flex-1 min-w-0">
+    <!-- Topbar -->
+    <header class="sticky top-0 z-20 bg-white/80 dark:bg-slate-900/80 glass border-b border-slate-200 dark:border-slate-800">
+      <div class="flex items-center gap-3 px-4 sm:px-6 py-3">
+        <button id="menuBtn" class="lg:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"><i class="fa-solid fa-bars"></i></button>
+        <h1 id="pageTitle" class="text-xl font-bold">Dashboard</h1>
+        <div class="ml-auto flex items-center gap-2">
+          <div class="relative hidden sm:block">
+            <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+            <input id="searchInput" placeholder="Search tasks…" class="pl-9 pr-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-brand-500"/>
+          </div>
+          <button id="themeToggle" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"><i class="fa-solid fa-moon dark:hidden"></i><i class="fa-solid fa-sun hidden dark:inline"></i></button>
+          <button id="newTaskBtn" class="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-lg gradient-bg text-white text-sm font-semibold shadow-soft hover:opacity-95">
+            <i class="fa-solid fa-plus"></i>New task
+          </button>
+          <button id="newTaskBtnMobile" class="sm:hidden p-2 rounded-lg gradient-bg text-white"><i class="fa-solid fa-plus"></i></button>
+        </div>
+      </div>
+    </header>
+
+    <div class="p-4 sm:p-6 max-w-7xl mx-auto">
+      <div id="loader" class="hidden flex items-center justify-center py-24"><div class="loader"></div></div>
+
+      <!-- DASHBOARD VIEW -->
+      <section id="view-dashboard" class="view space-y-6 animate-fade-in">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-soft">
+            <div class="flex items-center justify-between"><span class="text-sm text-slate-500">Total</span><i class="fa-solid fa-list-check text-brand-500"></i></div>
+            <div class="text-3xl font-bold mt-2" id="statTotal">0</div>
+          </div>
+          <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-soft">
+            <div class="flex items-center justify-between"><span class="text-sm text-slate-500">Completed</span><i class="fa-solid fa-circle-check text-emerald-500"></i></div>
+            <div class="text-3xl font-bold mt-2" id="statDone">0</div>
+          </div>
+          <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-soft">
+            <div class="flex items-center justify-between"><span class="text-sm text-slate-500">Pending</span><i class="fa-solid fa-clock text-amber-500"></i></div>
+            <div class="text-3xl font-bold mt-2" id="statPending">0</div>
+          </div>
+          <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-soft">
+            <div class="flex items-center justify-between"><span class="text-sm text-slate-500">Progress</span><i class="fa-solid fa-chart-line text-pink-500"></i></div>
+            <div class="text-3xl font-bold mt-2"><span id="statProgress">0</span>%</div>
+          </div>
+        </div>
+
+        <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-soft">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold">Overall progress</h3>
+            <span class="text-sm text-slate-500"><span id="progressLabel">0/0</span> tasks done</span>
+          </div>
+          <div class="h-3 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+            <div id="progressBar" class="h-full gradient-bg transition-all duration-700" style="width:0%"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold">Recent tasks</h3>
+            <button data-view="tasks" class="nav-btn text-sm text-brand-600 dark:text-brand-400 hover:underline">View all <i class="fa-solid fa-arrow-right text-xs"></i></button>
+          </div>
+          <div id="recentList" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+        </div>
+      </section>
+
+      <!-- TASKS VIEW -->
+      <section id="view-tasks" class="view hidden space-y-4 animate-fade-in">
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="relative flex-1 min-w-[200px] sm:hidden">
+            <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+            <input id="searchInputMobile" placeholder="Search…" class="pl-9 pr-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-sm w-full focus:outline-none focus:ring-2 focus:ring-brand-500"/>
+          </div>
+          <select id="filterStatus" class="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm">
+            <option value="all">All statuses</option><option value="pending">Pending</option><option value="completed">Completed</option>
+          </select>
+          <select id="filterPriority" class="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm">
+            <option value="all">All priorities</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>
+          </select>
+        </div>
+        <div id="tasksList" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+      </section>
+
+      <!-- BOARD VIEW -->
+      <section id="view-board" class="view hidden animate-fade-in">
+        <div class="grid md:grid-cols-3 gap-4">
+          <div class="drop-zone bg-slate-100/50 dark:bg-slate-900/50 rounded-2xl p-3 border-2 border-dashed border-transparent" data-status="pending">
+            <div class="flex items-center justify-between px-2 py-2"><span class="font-semibold flex items-center gap-2"><span class="w-2 h-2 bg-amber-500 rounded-full"></span>Pending</span><span class="text-xs text-slate-500" id="countPending">0</span></div>
+            <div id="boardPending" class="space-y-2 min-h-[100px]"></div>
+          </div>
+          <div class="drop-zone bg-slate-100/50 dark:bg-slate-900/50 rounded-2xl p-3 border-2 border-dashed border-transparent" data-status="in_progress">
+            <div class="flex items-center justify-between px-2 py-2"><span class="font-semibold flex items-center gap-2"><span class="w-2 h-2 bg-brand-500 rounded-full"></span>In progress</span><span class="text-xs text-slate-500" id="countProgress">0</span></div>
+            <div id="boardProgress" class="space-y-2 min-h-[100px]"></div>
+          </div>
+          <div class="drop-zone bg-slate-100/50 dark:bg-slate-900/50 rounded-2xl p-3 border-2 border-dashed border-transparent" data-status="completed">
+            <div class="flex items-center justify-between px-2 py-2"><span class="font-semibold flex items-center gap-2"><span class="w-2 h-2 bg-emerald-500 rounded-full"></span>Completed</span><span class="text-xs text-slate-500" id="countDone">0</span></div>
+            <div id="boardDone" class="space-y-2 min-h-[100px]"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CALENDAR VIEW -->
+      <section id="view-calendar" class="view hidden animate-fade-in">
+        <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-soft p-4">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold" id="calTitle">Month</h3>
+            <div class="flex gap-2">
+              <button id="calPrev" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"><i class="fa-solid fa-chevron-left"></i></button>
+              <button id="calToday" class="px-3 py-2 rounded-lg text-sm hover:bg-slate-100 dark:hover:bg-slate-800">Today</button>
+              <button id="calNext" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          </div>
+          <div class="grid grid-cols-7 gap-1 text-center text-xs font-medium text-slate-500 mb-2">
+            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+          </div>
+          <div id="calGrid" class="grid grid-cols-7 gap-1"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- TASK MODAL -->
+<div id="taskModal" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-black/50 glass">
+  <div class="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg shadow-soft border border-slate-200 dark:border-slate-800 animate-pop">
+    <div class="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+      <h3 class="font-semibold text-lg" id="modalTitle">New task</h3>
+      <button id="closeModal" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="taskForm" class="p-5 space-y-4">
+      <input type="hidden" name="id"/>
+      <div>
+        <label class="text-sm font-medium">Title</label>
+        <input name="title" required class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-brand-500"/>
+      </div>
+      <div>
+        <label class="text-sm font-medium">Description</label>
+        <textarea name="description" rows="3" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-sm font-medium">Priority</label>
+          <select name="priority" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm font-medium">Due date</label>
+          <input type="date" name="dueDate" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-brand-500"/>
+        </div>
+      </div>
+      <div>
+        <label class="text-sm font-medium">Tags (comma separated)</label>
+        <input name="tags" placeholder="design, urgent" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-brand-500"/>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" id="cancelModal" class="px-4 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium">Cancel</button>
+        <button type="submit" class="px-4 py-2 rounded-lg gradient-bg text-white text-sm font-semibold shadow-soft">Save task</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toasts" class="fixed top-4 right-4 z-[100] space-y-2"></div>
+
+<script>
+/* ========= STORAGE ========= */
+const LS = {
+  users: 'flow_users',
+  session: 'flow_session',
+  tasks: u => `flow_tasks_${u}`,
+  theme: 'flow_theme'
+};
+const get = (k, fb) => { try { return JSON.parse(localStorage.getItem(k)) ?? fb; } catch { return fb; } };
+const set = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+
+/* ========= STATE ========= */
+let state = {
+  user: get(LS.session, null),
+  tasks: [],
+  view: 'dashboard',
+  search: '',
+  filterStatus: 'all',
+  filterPriority: 'all',
+  editingId: null,
+  calDate: new Date(),
+};
+
+/* ========= TOAST ========= */
+function toast(msg, type='success'){
+  const colors = { success:'bg-emerald-500', error:'bg-red-500', info:'bg-brand-500' };
+  const icons = { success:'check', error:'xmark', info:'info' };
+  const el = document.createElement('div');
+  el.className = `toast-enter ${colors[type]} text-white px-4 py-3 rounded-xl shadow-soft flex items-center gap-2 text-sm font-medium`;
+  el.innerHTML = `<i class="fa-solid fa-${icons[type]}"></i>${msg}`;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>{ el.style.transition='all .3s'; el.style.opacity='0'; el.style.transform='translateX(120%)'; setTimeout(()=>el.remove(),300); }, 2500);
+}
+
+/* ========= THEME ========= */
+function applyTheme(){
+  const t = localStorage.getItem(LS.theme) || 'light';
+  document.documentElement.classList.toggle('dark', t==='dark');
+}
+document.getElementById('themeToggle').onclick = () => {
+  const cur = localStorage.getItem(LS.theme) || 'light';
+  localStorage.setItem(LS.theme, cur==='dark'?'light':'dark');
+  applyTheme();
+};
+applyTheme();
+
+/* ========= AUTH ========= */
+function showAuth(){
+  document.getElementById('authScreen').classList.remove('hidden');
+  document.getElementById('authScreen').classList.add('flex');
+  document.getElementById('app').classList.add('hidden');
+}
+function showApp(){
+  document.getElementById('authScreen').classList.add('hidden');
+  document.getElementById('authScreen').classList.remove('flex');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('app').classList.add('flex');
+  document.getElementById('userName').textContent = state.user.name;
+  document.getElementById('userEmail').textContent = state.user.email;
+  document.getElementById('userAvatar').textContent = state.user.name.charAt(0).toUpperCase();
+  loadTasks();
+}
+document.getElementById('tabLogin').onclick = () => switchTab('login');
+document.getElementById('tabSignup').onclick = () => switchTab('signup');
+function switchTab(t){
+  const isLogin = t==='login';
+  document.getElementById('loginForm').classList.toggle('hidden', !isLogin);
+  document.getElementById('signupForm').classList.toggle('hidden', isLogin);
+  document.getElementById('tabLogin').className = `flex-1 py-2 rounded-md font-medium text-sm ${isLogin?'bg-white dark:bg-slate-900 shadow':'text-slate-500'}`;
+  document.getElementById('tabSignup').className = `flex-1 py-2 rounded-md font-medium text-sm ${!isLogin?'bg-white dark:bg-slate-900 shadow':'text-slate-500'}`;
+}
+document.getElementById('loginForm').onsubmit = (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const email = fd.get('email').trim().toLowerCase();
+  const password = fd.get('password');
+  const users = get(LS.users, []);
+  const u = users.find(x=>x.email===email && x.password===password);
+  if(!u){ toast('Invalid credentials','error'); return; }
+  state.user = { id:u.id, name:u.name, email:u.email };
+  set(LS.session, state.user);
+  toast(`Welcome back, ${u.name}!`);
+  showApp();
+};
+document.getElementById('signupForm').onsubmit = (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const name = fd.get('name').trim();
+  const email = fd.get('email').trim().toLowerCase();
+  const password = fd.get('password');
+  if(!name||!email||password.length<4){ toast('Fill all fields (password 4+ chars)','error'); return; }
+  const users = get(LS.users, []);
+  if(users.some(x=>x.email===email)){ toast('Email already registered','error'); return; }
+  const u = { id: crypto.randomUUID(), name, email, password };
+  users.push(u); set(LS.users, users);
+  state.user = { id:u.id, name, email };
+  set(LS.session, state.user);
+  toast(`Welcome, ${name}!`);
+  showApp();
+};
+document.getElementById('logoutBtn').onclick = () => {
+  localStorage.removeItem(LS.session);
+  state.user = null; state.tasks = [];
+  toast('Signed out','info');
+  showAuth();
+};
+
+/* ========= TASKS ========= */
+function loadTasks(){
+  state.tasks = get(LS.tasks(state.user.id), []);
+  render();
+}
+function saveTasks(){ set(LS.tasks(state.user.id), state.tasks); }
+
+function openModal(task=null){
+  state.editingId = task?.id || null;
+  document.getElementById('modalTitle').textContent = task ? 'Edit task' : 'New task';
+  const f = document.getElementById('taskForm');
+  f.reset();
+  f.id.value = task?.id || '';
+  if(task){
+    f.title.value = task.title;
+    f.description.value = task.description||'';
+    f.priority.value = task.priority;
+    f.dueDate.value = task.dueDate||'';
+    f.tags.value = (task.tags||[]).join(', ');
+  }
+  const m = document.getElementById('taskModal');
+  m.classList.remove('hidden'); m.classList.add('flex');
+}
+function closeModal(){
+  const m = document.getElementById('taskModal');
+  m.classList.add('hidden'); m.classList.remove('flex');
+}
+document.getElementById('newTaskBtn').onclick = () => openModal();
+document.getElementById('newTaskBtnMobile').onclick = () => openModal();
+document.getElementById('closeModal').onclick = closeModal;
+document.getElementById('cancelModal').onclick = closeModal;
+document.getElementById('taskModal').onclick = (e) => { if(e.target.id==='taskModal') closeModal(); };
+
+document.getElementById('taskForm').onsubmit = (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const data = {
+    title: fd.get('title').trim(),
+    description: fd.get('description').trim(),
+    priority: fd.get('priority'),
+    dueDate: fd.get('dueDate') || null,
+    tags: fd.get('tags').split(',').map(t=>t.trim()).filter(Boolean),
+  };
+  if(!data.title){ toast('Title required','error'); return; }
+  const id = fd.get('id');
+  if(id){
+    const t = state.tasks.find(x=>x.id===id);
+    Object.assign(t, data, { updatedAt: Date.now() });
+    toast('Task updated');
+  } else {
+    state.tasks.unshift({ id: crypto.randomUUID(), status:'pending', createdAt:Date.now(), updatedAt:Date.now(), ...data });
+    toast('Task created');
+  }
+  saveTasks(); render(); closeModal();
+};
+
+function toggleComplete(id){
+  const t = state.tasks.find(x=>x.id===id);
+  t.status = t.status==='completed' ? 'pending' : 'completed';
+  saveTasks(); render();
+  toast(t.status==='completed'?'Completed 🎉':'Reopened','info');
+}
+function deleteTask(id){
+  if(!confirm('Delete this task?')) return;
+  state.tasks = state.tasks.filter(x=>x.id!==id);
+  saveTasks(); render();
+  toast('Task deleted','error');
+}
+function setStatus(id, status){
+  const t = state.tasks.find(x=>x.id===id);
+  if(t && t.status!==status){ t.status = status; saveTasks(); render(); }
+}
+
+/* ========= RENDER ========= */
+const priorityClasses = {
+  high:'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300',
+  medium:'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
+  low:'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
+};
+function taskCardHTML(t, opts={}){
+  const overdue = t.dueDate && t.status!=='completed' && new Date(t.dueDate) < new Date(new Date().toDateString());
+  const tags = (t.tags||[]).map(tag=>`<span class="text-xs px-2 py-0.5 rounded-full bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-300">#${tag}</span>`).join('');
+  return `
+  <div class="task-card group bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-soft hover:shadow-lg hover:-translate-y-0.5 transition-all animate-slide-up ${opts.draggable?'cursor-grab':''}" 
+       ${opts.draggable?`draggable="true" data-id="${t.id}"`:''}>
+    <div class="flex items-start gap-3">
+      <button onclick="toggleComplete('${t.id}')" class="checkbox-custom mt-0.5 w-5 h-5 rounded-md border-2 border-slate-300 dark:border-slate-600 flex items-center justify-center shrink-0 ${t.status==='completed'?'checked':''}">
+        ${t.status==='completed'?'<i class="fa-solid fa-check text-white text-xs"></i>':''}
+      </button>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <h4 class="font-semibold ${t.status==='completed'?'line-through text-slate-400':''}">${escapeHTML(t.title)}</h4>
+          <span class="text-xs px-2 py-0.5 rounded-full ${priorityClasses[t.priority]} capitalize">${t.priority}</span>
+        </div>
+        ${t.description?`<p class="text-sm text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">${escapeHTML(t.description)}</p>`:''}
+        <div class="flex items-center gap-2 mt-2 flex-wrap">
+          ${t.dueDate?`<span class="text-xs flex items-center gap-1 ${overdue?'text-red-500':'text-slate-500'}"><i class="fa-regular fa-calendar"></i>${formatDate(t.dueDate)}</span>`:''}
+          ${tags}
+        </div>
+      </div>
+      <div class="opacity-0 group-hover:opacity-100 transition flex gap-1">
+        <button onclick="openModal(state.tasks.find(x=>x.id==='${t.id}'))" class="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500"><i class="fa-solid fa-pen text-xs"></i></button>
+        <button onclick="deleteTask('${t.id}')" class="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-500/20 text-red-500"><i class="fa-solid fa-trash text-xs"></i></button>
+      </div>
+    </div>
+  </div>`;
+}
+function escapeHTML(s){ return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function formatDate(d){
+  const dt = new Date(d);
+  return dt.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+}
+function emptyState(msg, sub){
+  return `<div class="col-span-full text-center py-16">
+    <div class="inline-flex w-16 h-16 rounded-2xl gradient-bg items-center justify-center shadow-soft mb-4 animate-pop">
+      <i class="fa-solid fa-clipboard-list text-white text-2xl"></i>
+    </div>
+    <h3 class="font-semibold text-lg">${msg}</h3>
+    <p class="text-sm text-slate-500 mt-1">${sub}</p>
+  </div>`;
+}
+
+function filteredTasks(){
+  const q = state.search.toLowerCase();
+  return state.tasks.filter(t=>{
+    if(state.filterStatus!=='all' && t.status!==state.filterStatus && !(state.filterStatus==='pending' && t.status==='in_progress')) return false;
+    if(state.filterPriority!=='all' && t.priority!==state.filterPriority) return false;
+    if(q && !t.title.toLowerCase().includes(q) && !(t.description||'').toLowerCase().includes(q) && !(t.tags||[]).some(tag=>tag.toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function render(){
+  // stats
+  const total = state.tasks.length;
+  const done = state.tasks.filter(t=>t.status==='completed').length;
+  const pending = total - done;
+  const pct = total ? Math.round(done/total*100) : 0;
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statDone').textContent = done;
+  document.getElementById('statPending').textContent = pending;
+  document.getElementById('statProgress').textContent = pct;
+  document.getElementById('progressBar').style.width = pct+'%';
+  document.getElementById('progressLabel').textContent = `${done}/${total}`;
+
+  // recent
+  document.getElementById('recentList').innerHTML = state.tasks.length
+    ? state.tasks.slice(0,6).map(t=>taskCardHTML(t)).join('')
+    : emptyState('No tasks yet','Click "New task" to get started.');
+
+  // tasks
+  const ft = filteredTasks();
+  document.getElementById('tasksList').innerHTML = ft.length
+    ? ft.map(t=>taskCardHTML(t)).join('')
+    : emptyState('Nothing here','Try a different search or filter.');
+
+  // board
+  const groups = { pending:[], in_progress:[], completed:[] };
+  state.tasks.forEach(t=>{ (groups[t.status]||groups.pending).push(t); });
+  document.getElementById('boardPending').innerHTML = groups.pending.map(t=>taskCardHTML(t,{draggable:true})).join('') || `<div class="text-xs text-slate-400 text-center py-6">Drop tasks here</div>`;
+  document.getElementById('boardProgress').innerHTML = groups.in_progress.map(t=>taskCardHTML(t,{draggable:true})).join('') || `<div class="text-xs text-slate-400 text-center py-6">Drop tasks here</div>`;
+  document.getElementById('boardDone').innerHTML = groups.completed.map(t=>taskCardHTML(t,{draggable:true})).join('') || `<div class="text-xs text-slate-400 text-center py-6">Drop tasks here</div>`;
+  document.getElementById('countPending').textContent = groups.pending.length;
+  document.getElementById('countProgress').textContent = groups.in_progress.length;
+  document.getElementById('countDone').textContent = groups.completed.length;
+  bindDrag();
+
+  // calendar
+  renderCalendar();
+}
+
+/* ========= DRAG & DROP ========= */
+function bindDrag(){
+  document.querySelectorAll('.task-card[draggable="true"]').forEach(el=>{
+    el.addEventListener('dragstart', e=>{ el.classList.add('dragging'); e.dataTransfer.setData('text/plain', el.dataset.id); });
+    el.addEventListener('dragend', ()=>el.classList.remove('dragging'));
+  });
+  document.querySelectorAll('.drop-zone').forEach(z=>{
+    z.addEventListener('dragover', e=>{ e.preventDefault(); z.classList.add('drag-over'); });
+    z.addEventListener('dragleave', ()=>z.classList.remove('drag-over'));
+    z.addEventListener('drop', e=>{
+      e.preventDefault(); z.classList.remove('drag-over');
+      const id = e.dataTransfer.getData('text/plain');
+      setStatus(id, z.dataset.status);
+      toast('Status updated','info');
+    });
+  });
+}
+
+/* ========= CALENDAR ========= */
+function renderCalendar(){
+  const d = state.calDate;
+  const year = d.getFullYear(), month = d.getMonth();
+  document.getElementById('calTitle').textContent = d.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+  const first = new Date(year, month, 1).getDay();
+  const days = new Date(year, month+1, 0).getDate();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const grid = document.getElementById('calGrid');
+  let html = '';
+  for(let i=0;i<first;i++) html += `<div></div>`;
+  for(let day=1; day<=days; day++){
+    const date = new Date(year, month, day);
+    const iso = date.toISOString().slice(0,10);
+    const dayTasks = state.tasks.filter(t=>t.dueDate===iso);
+    const isToday = date.getTime()===today.getTime();
+    html += `<div class="min-h-[80px] p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 ${isToday?'bg-brand-50 dark:bg-brand-500/10 border-brand-500':''}">
+      <div class="text-xs font-semibold ${isToday?'text-brand-600 dark:text-brand-400':'text-slate-500'}">${day}</div>
+      <div class="space-y-0.5 mt-1">
+        ${dayTasks.slice(0,3).map(t=>`<div class="text-[10px] truncate px-1 py-0.5 rounded ${priorityClasses[t.priority]}">${escapeHTML(t.title)}</div>`).join('')}
+        ${dayTasks.length>3?`<div class="text-[10px] text-slate-400">+${dayTasks.length-3}</div>`:''}
+      </div>
+    </div>`;
+  }
+  grid.innerHTML = html;
+}
+document.getElementById('calPrev').onclick = () => { state.calDate = new Date(state.calDate.getFullYear(), state.calDate.getMonth()-1, 1); renderCalendar(); };
+document.getElementById('calNext').onclick = () => { state.calDate = new Date(state.calDate.getFullYear(), state.calDate.getMonth()+1, 1); renderCalendar(); };
+document.getElementById('calToday').onclick = () => { state.calDate = new Date(); renderCalendar(); };
+
+/* ========= NAV ========= */
+const titles = { dashboard:'Dashboard', tasks:'Tasks', board:'Board', calendar:'Calendar' };
+function setView(v){
+  state.view = v;
+  document.querySelectorAll('.view').forEach(el=>el.classList.add('hidden'));
+  document.getElementById('view-'+v).classList.remove('hidden');
+  document.getElementById('pageTitle').textContent = titles[v];
+  document.querySelectorAll('.nav-btn').forEach(b=>{
+    if(b.dataset.view===v) b.classList.add('bg-brand-50','dark:bg-brand-500/10','text-brand-600','dark:text-brand-400');
+    else b.classList.remove('bg-brand-50','dark:bg-brand-500/10','text-brand-600','dark:text-brand-400');
+  });
+  if(window.innerWidth<1024) closeSidebar();
+}
+document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click', ()=>setView(b.dataset.view)));
+
+/* ========= SIDEBAR MOBILE ========= */
+function openSidebar(){
+  document.getElementById('sidebar').classList.remove('-translate-x-full');
+  document.getElementById('sidebarBackdrop').classList.remove('hidden');
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.add('-translate-x-full');
+  document.getElementById('sidebarBackdrop').classList.add('hidden');
+}
+document.getElementById('menuBtn').onclick = openSidebar;
+document.getElementById('sidebarBackdrop').onclick = closeSidebar;
+
+/* ========= SEARCH & FILTERS ========= */
+['searchInput','searchInputMobile'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', e=>{
+    state.search = e.target.value;
+    if(id==='searchInput') document.getElementById('searchInputMobile').value = e.target.value;
+    else document.getElementById('searchInput').value = e.target.value;
+    render();
+  });
+});
+document.getElementById('filterStatus').onchange = e => { state.filterStatus = e.target.value; render(); };
+document.getElementById('filterPriority').onchange = e => { state.filterPriority = e.target.value; render(); };
+
+/* ========= BOOT ========= */
+if(state.user){ showApp(); setView('dashboard'); } else { showAuth(); }
+</script>
+</body>
+</html>
